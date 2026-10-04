@@ -4,6 +4,7 @@ import {
   SPECTRA6_CANONICAL,
   ditherSpectra6,
   encodeSpectra6Png,
+  paletteForModel,
   parsePalette,
 } from './spectra6.util';
 
@@ -52,6 +53,16 @@ describe('spectra6.util', () => {
       expect(parsePalette('')).toBeUndefined();
       expect(parsePalette(undefined)).toBeUndefined();
       expect(parsePalette(['spectra6'])).toBeUndefined();
+    });
+  });
+
+  describe('paletteForModel', () => {
+    it('selects spectra6 only for 6-colour PNG models', () => {
+      expect(paletteForModel({ colors: 6, mimeType: 'image/png' })).toBe('spectra6');
+      expect(paletteForModel({ colors: 6, mimeType: 'image/bmp' })).toBeUndefined();
+      expect(paletteForModel({ colors: 2, mimeType: 'image/png' })).toBeUndefined();
+      expect(paletteForModel(null)).toBeUndefined();
+      expect(paletteForModel(undefined)).toBeUndefined();
     });
   });
 

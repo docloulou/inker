@@ -411,6 +411,21 @@ export class PluginsService {
   }
 
   /**
+   * Palette for admin previews of an instance: 'spectra6' when any device whose playlist
+   * shows this instance is a Spectra 6 (6-colour, PNG) model, so previews match the panel.
+   */
+  async previewPaletteForInstance(instanceId: number): Promise<ColorPalette | undefined> {
+    const colourDevice = await this.prisma.device.findFirst({
+      where: {
+        model: { is: { colors: 6, mimeType: { not: 'image/bmp' } } },
+        playlist: { is: { items: { some: { pluginInstanceId: instanceId } } } },
+      },
+      select: { id: true },
+    });
+    return colourDevice ? 'spectra6' : undefined;
+  }
+
+  /**
    * Render a plugin instance to PNG for device display.
    * `palette` (e.g. 'spectra6') keeps colour for colour e-ink panels in device/einkPreview modes.
    */
