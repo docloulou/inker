@@ -528,7 +528,13 @@ export class PluginsController {
       : 'preview') as 'device' | 'preview' | 'einkPreview';
 
     // palette=spectra6 → 6-colour indexed PNG for Spectra 6 panels; unknown values are ignored.
-    const imageBuffer = await this.pluginsService.renderInstance(id, validLayout, validMode, parsePalette(palette));
+    // Admin previews (einkPreview) carry no palette, so derive it from the devices showing this
+    // instance; an explicit palette always wins and device/preview modes are never inferred.
+    let validPalette = parsePalette(palette);
+    if (!validPalette && validMode === 'einkPreview') {
+      validPalette = await this.pluginsService.previewPaletteForInstance(id);
+    }
+    const imageBuffer = await this.pluginsService.renderInstance(id, validLayout, validMode, validPalette);
 
     res.set({
       'Content-Type': 'image/png',

@@ -7,7 +7,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import type { ColorPalette } from '../../common/utils/spectra6.util';
+import { paletteForModel } from '../../common/utils/spectra6.util';
 import { DefaultScreenService } from './default-screen.service';
 import { SleepScreenService } from './sleep-screen.service';
 import { ScreenRendererService } from '../../screen-designer/services/screen-renderer.service';
@@ -223,7 +223,7 @@ export class DisplayService {
     const bitDepth = device.model?.bitDepth ?? 1;
     const isBmp = device.model?.mimeType === 'image/bmp';
     const imageFormat: 'png' | 'bmp' = isBmp ? 'bmp' : 'png';
-    const palette: ColorPalette | undefined = device.model?.colors === 6 && !isBmp ? 'spectra6' : undefined;
+    const palette = paletteForModel(device.model);
     const devW = device.width || 800;
     const devH = device.height || 480;
     // Swap a filename's extension to match the served format (drives the device's
@@ -920,6 +920,7 @@ export class DisplayService {
     const device = await this.prisma.device.findUnique({
       where: { id: deviceId },
       include: {
+        model: true,
         playlist: {
           include: {
             items: {
@@ -998,6 +999,16 @@ export class DisplayService {
         currentScreen.screenDesign.id,
         deviceContext,
         true, // preview mode
+      );
+    }
+
+    // Plugin instances: render as the e-ink preview, in colour for Spectra 6 devices
+    if (currentScreen.pluginInstance?.plugin) {
+      return this.pluginsService.renderInstance(
+        currentScreen.pluginInstance.id,
+        'full',
+        'einkPreview',
+        paletteForModel(device.model),
       );
     }
 

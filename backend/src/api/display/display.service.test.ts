@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { DisplayService } from './display.service';
 import { createMockPrisma } from '../../test/mocks/prisma.mock';
-import { createMock } from '../../test/mocks/helpers';
+import { createMock, type MockFn } from '../../test/mocks/helpers';
+import type { PluginsService } from '../../plugins/plugins.service';
 
 describe('DisplayService', () => {
   let service: DisplayService;
@@ -10,6 +11,7 @@ describe('DisplayService', () => {
   let mockDefaultScreenService: any;
   let mockSleepScreenService: any;
   let mockScreenRendererService: any;
+  let mockPluginsService: { renderInstance: MockFn<Promise<Buffer>> };
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
@@ -45,12 +47,17 @@ describe('DisplayService', () => {
     mockScreenRendererService = {
       renderScreenDesign: createMock().mockResolvedValue(Buffer.from('PNG')),
     };
+    mockPluginsService = {
+      renderInstance: createMock().mockResolvedValue(Buffer.from('PLUGINPNG')),
+    };
     service = new DisplayService(
       mockPrisma as any,
       mockConfig,
       mockDefaultScreenService,
       mockSleepScreenService,
       mockScreenRendererService,
+      // Only renderInstance is exercised by DisplayService's preview path.
+      mockPluginsService as unknown as PluginsService,
     );
   });
 
@@ -313,6 +320,36 @@ describe('DisplayService', () => {
       expect(mockSleepScreenService.getSleepScreenBuffer.calls.length).toBe(1);
       expect(mockScreenRendererService.renderScreenDesign.calls.length).toBe(0);
       expect(result).toBeInstanceOf(Buffer);
+    });
+
+    describe('plugin items', () => {
+      const deviceWithPlugin = (model: Record<string, unknown> | null) => ({
+        id: 1,
+        name: 'Test',
+        model,
+        playlist: {
+          items: [{
+            duration: 60,
+            screenDesign: null,
+            screen: null,
+            pluginInstance: { id: 7, plugin: { slug: 'weather', name: 'Weather' } },
+          }],
+        },
+      });
+
+      it('renders the plugin as a Spectra 6 e-ink preview on a colors-6 PNG device', async () => {
+        mockPrisma.device.findUnique.mockResolvedValue(deviceWithPlugin({ colors: 6, mimeType: 'image/png' }));
+        const result = await service.getCurrentScreenImage(1);
+        expect(mockPluginsService.renderInstance.calls).toEqual([[7, 'full', 'einkPreview', 'spectra6']]);
+        expect(result.toString()).toBe('PLUGINPNG');
+        expect(mockDefaultScreenService.getDefaultScreenPreviewBuffer.calls.length).toBe(0);
+      });
+
+      it('renders the plugin without a palette on a 2-colour device', async () => {
+        mockPrisma.device.findUnique.mockResolvedValue(deviceWithPlugin({ colors: 2, mimeType: 'image/png' }));
+        await service.getCurrentScreenImage(1);
+        expect(mockPluginsService.renderInstance.calls).toEqual([[7, 'full', 'einkPreview', undefined]]);
+      });
     });
   });
 

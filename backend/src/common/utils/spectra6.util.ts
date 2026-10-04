@@ -24,6 +24,16 @@ export function parsePalette(raw: unknown): ColorPalette | undefined {
   return raw === 'spectra6' ? 'spectra6' : undefined;
 }
 
+/**
+ * Render palette for a device model: 6-colour PNG panels (Spectra 6) render in colour; BMP
+ * containers are 1-bit only, so they and every other model keep the default monochrome path.
+ */
+export function paletteForModel(
+  model: { colors?: number | null; mimeType?: string | null } | null | undefined,
+): ColorPalette | undefined {
+  return model?.colors === 6 && model.mimeType !== 'image/bmp' ? 'spectra6' : undefined;
+}
+
 export type Rgb = readonly [number, number, number];
 
 /** Index order shared by both palettes: black, white, yellow, red, blue, green. */
