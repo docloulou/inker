@@ -567,6 +567,53 @@ describe('DisplayService', () => {
       expect(result.image_url).toContain('format=bmp');
       expect(result.filename).toMatch(/\.bmp$/);
     });
+
+    describe('Spectra 6 colour palette', () => {
+      const deviceWith = (model: Record<string, unknown>, item: Record<string, unknown>) => ({
+        id: 1, name: 'S6', refreshRate: 900, refreshPending: false, width: 800, height: 480,
+        model: { width: 800, height: 480, bitDepth: 1, ...model },
+        playlist: { items: [{ duration: 60, ...item }] },
+      });
+      const designItem = { screenDesign: { id: 7, name: 'D' } };
+      const pluginItem = { pluginInstance: { id: 3, plugin: { slug: 'weather', name: 'Weather' } } };
+
+      beforeEach(() => {
+        mockPrisma.device.update.mockResolvedValue({ id: 1, battery: null, wifi: null });
+        mockPrisma.firmware.findFirst.mockResolvedValue(null);
+      });
+
+      it('appends palette=spectra6 to the designed-screen render URL for a colors-6 PNG model', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(deviceWith({ mimeType: 'image/png', colors: 6 }, designItem));
+        const result = await service.getDisplayContent('test-key');
+        expect(result.image_url).toContain('/api/device-images/design/7');
+        expect(result.image_url).toContain('palette=spectra6');
+        expect(result.image_url).not.toContain('bitDepth=');
+        expect(result.filename).toMatch(/\.png$/);
+      });
+
+      it('appends palette=spectra6 to the plugin render URL for a colors-6 PNG model', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(deviceWith({ mimeType: 'image/png', colors: 6 }, pluginItem));
+        const result = await service.getDisplayContent('test-key');
+        expect(result.image_url).toMatch(/\/api\/plugins\/instances\/3\/render\?mode=device&palette=spectra6&t=\d+$/);
+      });
+
+      it('does not append a palette for 1-bit or grayscale models', async () => {
+        for (const model of [{ mimeType: 'image/png', colors: 2 }, { mimeType: 'image/png', colors: 16, bitDepth: 4 }]) {
+          for (const item of [designItem, pluginItem]) {
+            mockPrisma.device.findFirst.mockResolvedValue(deviceWith(model, item));
+            const result = await service.getDisplayContent('test-key');
+            expect(result.image_url).not.toContain('palette=');
+          }
+        }
+      });
+
+      it('does not append a palette for a colors-6 BMP model (colour BMP unsupported)', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(deviceWith({ mimeType: 'image/bmp', colors: 6 }, designItem));
+        const result = await service.getDisplayContent('test-key');
+        expect(result.image_url).not.toContain('palette=');
+        expect(result.image_url).toContain('format=bmp');
+      });
+    });
   });
 
   describe('getDisplayContent - TRMNL X touch advance-on-tap', () => {
